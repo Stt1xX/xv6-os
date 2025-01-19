@@ -318,7 +318,7 @@ void bd_init(void *base, void *end) {
   // initialize free list and allocate the alloc array for each size k
   for (int k = 0; k < nsizes; k++) {
     lst_init(&bd_sizes[k].free);
-    sz = sizeof(char) * ROUNDUP(NBLK(k), 8) / 8 / 2; // в два раза меньше
+    sz = sizeof(char) * ROUNDUP(NBLK(k), 16) / 16; // в два раза меньше
     bd_sizes[k].xor = p;
     memset(bd_sizes[k].xor, 0, sz);
     p += sz;
