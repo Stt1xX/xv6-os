@@ -229,7 +229,7 @@ void bd_mark(void *start, void *stop) {
         // if a block is allocated at size k, mark it as split too.
         bit_set(bd_sizes[k].split, bi);
       }
-      bit_set(bd_sizes[k].xor, blk_pair_index(k, addr(k, bi)));
+      bit_change(bd_sizes[k].xor, blk_pair_index(k, addr(k, bi)));
     }
   }
 }
@@ -249,26 +249,18 @@ int bd_initfree_pair(int k, int bi, int call_type) {
   return free;
 }
 
-int define_call(int index){
-  if (index % 2 == 0){
-    return RIGHT_CALL;
-  } else {
-    return LEFT_CALL;
-  }
-}
-
 // Initialize the free lists for each size k.  For each size k, there
 // are only two pairs that may have a buddy that should be on free list:
 // bd_left and bd_right.
 int bd_initfree(void *bd_left, void *bd_right) {
+  
   int free = 0;
-
   for (int k = 0; k < MAXSIZE; k++) {  // skip max size
     int left = blk_index_next(k, bd_left);
     int right = blk_index(k, bd_right);
-    free += bd_initfree_pair(k, left, define_call(left));
+    free += bd_initfree_pair(k, left, LEFT_CALL);
     if (right <= left) continue;
-    free += bd_initfree_pair(k, right, define_call(right));
+    free += bd_initfree_pair(k, right, RIGHT_CALL);
   }
   return free;
 }
