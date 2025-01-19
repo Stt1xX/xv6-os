@@ -31,7 +31,7 @@ typedef struct list Bd_list;
 // 8 blocks).
 struct sz_info {
   Bd_list free;
-  char *alloc;
+  // char *alloc;
   char *xor; // по задумке в два раза меньше alloc
   char *split;
 };
@@ -181,7 +181,7 @@ void bd_free(void *p) {
     int bi = blk_index(k, p);
     int buddy = (bi % 2 == 0) ? bi + 1 : bi - 1;
     bit_change(bd_sizes[k].xor, blk_pair_index(k, p));
-    if (bit_isset(bd_sizes[k].alloc, buddy)) {  // is buddy allocated?
+    if (bit_isset(bd_sizes[k].xor, blk_pair_index(k, p))) {  // is buddy allocated?
       break;                                    // break out of loop
     }
     // budy is free; merge with buddy
@@ -229,7 +229,7 @@ void bd_mark(void *start, void *stop) {
         // if a block is allocated at size k, mark it as split too.
         bit_set(bd_sizes[k].split, bi);
       }
-      bit_set(bd_sizes[k].alloc, bi);
+      bit_set(bd_sizes[k].xor, blk_pair_index(k, addr(k, bi)));
     }
   }
 }
@@ -239,15 +239,22 @@ void bd_mark(void *start, void *stop) {
 int bd_initfree_pair(int k, int bi, int call_type) {
   int buddy = (bi % 2 == 0) ? bi + 1 : bi - 1;
   int free = 0;
-  if (bit_isset(bd_sizes[k].alloc, bi) != bit_isset(bd_sizes[k].alloc, buddy)) {
-    // one of the pair is free
+  if (bit_isset(bd_sizes[k].xor, blk_pair_index(k, addr(k, bi)))) {
     free = BLK_SIZE(k);
-    if (bit_isset(bd_sizes[k].alloc, bi))
+    if ((call_type == LEFT_CALL && buddy > bi) || (call_type == RIGHT_CALL && buddy < bi))
       lst_push(&bd_sizes[k].free, addr(k, buddy));  // put buddy on free list
     else
       lst_push(&bd_sizes[k].free, addr(k, bi));  // put bi on free list
   }
   return free;
+}
+
+int define_call(int index){
+  if (index % 2 == 0){
+    return RIGHT_CALL;
+  } else {
+    return LEFT_CALL;
+  }
 }
 
 // Initialize the free lists for each size k.  For each size k, there
@@ -259,9 +266,9 @@ int bd_initfree(void *bd_left, void *bd_right) {
   for (int k = 0; k < MAXSIZE; k++) {  // skip max size
     int left = blk_index_next(k, bd_left);
     int right = blk_index(k, bd_right);
-    free += bd_initfree_pair(k, left, LEFT_CALL);
+    free += bd_initfree_pair(k, left, define_call(left));
     if (right <= left) continue;
-    free += bd_initfree_pair(k, right, RIGHT_CALL);
+    free += bd_initfree_pair(k, right, define_call(right));
   }
   return free;
 }
@@ -311,9 +318,9 @@ void bd_init(void *base, void *end) {
   // initialize free list and allocate the alloc array for each size k
   for (int k = 0; k < nsizes; k++) {
     lst_init(&bd_sizes[k].free);
-    sz = sizeof(char) * ROUNDUP(NBLK(k), 8) / 8;
-    bd_sizes[k].alloc = p;
-    memset(bd_sizes[k].alloc, 0, sz);
+    sz = sizeof(char) * ROUNDUP(NBLK(k), 8) / 8 / 2; // в два раза меньше
+    bd_sizes[k].xor = p;
+    memset(bd_sizes[k].xor, 0, sz);
     p += sz;
   }
 
